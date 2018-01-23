@@ -1,14 +1,14 @@
 #!/bin/sh
 # lightsun
-TOOL_VERSION=2
+TOOL_VERSION=3
 TOOL_BUILD=alpha
 SEEDUTIL_COMMAND="sudo /System/Library/PrivateFrameworks/Seeding.framework/Versions/A/Resources/seedutil"
 SYSTEM_BUILD="$(sw_vers -buildVersion)"
 SYSTEM_VERSION="$(sw_vers -productVersion)"
 
 function setDefaultSettings(){
-	PLATFORM=macOS
-	detectCatalog
+	PLATFORM=iOS
+	CATALOG=https://mesu.apple.com/assets/iOS11DeveloperSeed
 }
 
 function setProjectPath(){
@@ -33,9 +33,9 @@ function showInferface(){
 		echo "lightsun_${TOOL_BUILD}-${TOOL_VERSION} by pookjw"
 		showLines "-"
 		if [[ -z "${PLATFORM}" ]]; then
-			echo "(1) Platform (required): (undefined)"
+			echo "(1) Platform : (undefined)"
 		else
-			echo "(1) Platform (required): ${PLATFORM}"
+			echo "(1) Platform : ${PLATFORM}"
 		fi
 		if [[ -z "${DEVICE}" ]]; then
 			echo "(2) Device: (undefined)"
@@ -53,19 +53,21 @@ function showInferface(){
 			echo "(4) Build: ${BUILD}"
 		fi
 		if [[ -z "${CATALOG}" ]]; then
-			echo "(5) Catalog (required): (undefined)"
+			echo "(5) Catalog : (undefined)"
 		else
-			echo "(5) Catalog (required): ${CATALOG}"
+			echo "(5) Catalog : ${CATALOG}"
 		fi
-		if [[ -z "${PREREQUISITE_VERISON}" ]]; then
-			echo "(6) Version (Prerequisite): (undefined)"
-		else
-			echo "(6) Version (Prerequisite): ${PREREQUISITE_VERISON}"
-		fi
-		if [[ -z "${PREREQUISITE_BUILD}" ]]; then
-			echo "(7) Build (Prerequisite): (undefined)"
-		else
-			echo "(7) Build (Prerequisite): ${PREREQUISITE_BUILD}"
+		if [[ ! "${PLATFORM}" == macOS ]]; then
+			if [[ -z "${PREREQUISITE_VERISON}" ]]; then
+				echo "(6) Prerequisite Version: (undefined)"
+			else
+				echo "(6) Prerequisite Version: ${PREREQUISITE_VERISON}"
+			fi
+			if [[ -z "${PREREQUISITE_BUILD}" ]]; then
+				echo "(7) Prerequisite Build: (undefined)"
+			else
+				echo "(7) Prerequisite Build: ${PREREQUISITE_BUILD}"
+			fi
 		fi
 		showLines "-"
 		echo "commands: 1~7, adv, back, exit, reset, start"
@@ -153,12 +155,20 @@ function showInferface(){
 				done
 			fi
 		elif [[ "${ANSWER}" == 6 ]]; then
-			readAnswer "PREREQUISITE_VERISON=" PREREQUISITE_VERISON
+			if [[ "${PLATFORM}" == macOS ]]; then
+				showNotSupportedCommand
+			else
+				readAnswer "PREREQUISITE_VERISON=" PREREQUISITE_VERISON
+			fi
 		elif [[ "${ANSWER}" == 7 ]]; then
-			readAnswer "PREREQUISITE_BUILD=" PREREQUISITE_BUILD
-		elif [[ "${ANSWER}" == reset ]]; then
+			if [[ "${PLATFORM}" == macOS ]]; then
+				showNotSupportedCommand
+			else
+				readAnswer "PREREQUISITE_BUILD=" PREREQUISITE_BUILD
+			fi
+		elif [[ "${ANSWER}" == reset || "${ANSWER}" == r ]]; then
 			resetValues
-		elif [[ "${ANSWER}" == start ]]; then
+		elif [[ "${ANSWER}" == start || "${ANSWER}" == s ]]; then
 			if [[ -z "${PLATFORM}" || -z "${CATALOG}" ]]; then
 				showError "Fill Platform and Catalog."
 				showPA2C
@@ -177,12 +187,12 @@ function detectCatalog(){
 		CURRENT_ENROLLED_SEED=$(${SEEDUTIL_COMMAND} current | grep "Currently enrolled in" | cut -d" " -f4)
 		echo "Currently enrolled in: ${CURRENT_ENROLLED_SEED}"
 		if [[ "${CURRENT_ENROLLED_SEED}" == "(null)" ]]; then
-			${SEEDUTIL_COMMAND} enroll DeveloperSeed > /dev/null 2>&1
+			"${SEEDUTIL_COMMAND}" enroll DeveloperSeed > /dev/null 2>&1
 		fi
-		CATALOG=$(sudo /System/Library/PrivateFrameworks/Seeding.framework/Versions/A/Resources/seedutil current | grep CatalogURL | cut -d" " -f2)
+		CATALOG=$(${SEEDUTIL_COMMAND} current | grep CatalogURL | cut -d" " -f2)
 		echo "CatalogURL: ${CATALOG}"
 		if [[ "${CURRENT_ENROLLED_SEED}" == "(null)" ]]; then
-			${SEEDUTIL_COMMAND} unenroll > /dev/null 2>&1
+			"${SEEDUTIL_COMMAND}" unenroll > /dev/null 2>&1
 		fi
 		showPA2C
 	else
@@ -273,11 +283,14 @@ function showAdvancedSettings(){
 		elif [[ "${ANSWER}" == 2 ]]; then
 			backTitleBar
 		elif [[ "${ANSWER}" == 3 ]]; then
-			${SEEDUTIL_COMMAND} enroll DeveloperSeed
+			"${SEEDUTIL_COMMAND}" enroll DeveloperSeed
+			showPA2C
 		elif [[ "${ANSWER}" == 4 ]]; then
-			${SEEDUTIL_COMMAND} enroll PublicSeed
+			"${SEEDUTIL_COMMAND}" enroll PublicSeed
+			showPA2C
 		elif [[ "${ANSWER}" == 5 ]]; then
-			${SEEDUTIL_COMMAND} unenroll
+			"${SEEDUTIL_COMMAND}" unenroll
+			showPA2C
 		else
 			replyAnswer
 		fi
@@ -346,6 +359,7 @@ function backTitleBar(){
 function startService(){
 	downloadCatalog
 	parseAssets
+	showFinder
 	quitTool 0
 }
 
@@ -373,12 +387,15 @@ function downloadCatalog(){
 }
 
 function parseAssets(){
+	mkdir -p "${PROJECT_DIR}/data"
 	if [[ "${PLATFORM}" == macOS ]]; then
-		mkdir -p "${PROJECT_DIR}/data"
 		VALUE=
+		START_RECORDING=NO
 		PASS_ONCE_1=YES
 		PASS_ONCE_2=NO
-		PASS_ONCE_3=YES
+		PASS_ONCE_3=NO
+		PASS_ONCE_4=NO
+		PASS_ONCE_5=NO
 		for VALUE in $(cat "${PROJECT_DIR}/assets.xml"); do
 			if [[ "${PASS_ONCE_1}" == YES ]]; then
 				SUB_VALUE_1="${VALUE}"
@@ -405,13 +422,129 @@ function parseAssets(){
 					START_RECORDING=YES
 				fi
 			fi
+			if [[ ! -z "$(echo "${VALUE}" | grep ".dist</string>")" ]]; then
+				PASS_ONCE_4=YES
+				PASS_ONCE_5=NO
+			elif [[ "${PASS_ONCE_4}" == YES ]]; then
+				PASS_ONCE_4=NO
+				PASS_ONCE_5=YES
+			elif [[ "${PASS_ONCE_5}" == YES ]]; then
+				START_RECORDING=NO
+				PASS_ONCE_5=NO
+			fi
 			if [[ "${START_RECORDING}" == YES ]]; then
-				echo "${VALUE}" >> "${PROJECT_DIR}/data/${UPDATE_KEY}"
+				echo "${VALUE}" >> "${PROJECT_DIR}/data/${UPDATE_KEY}.txt"
 			fi
 		done
 	else
-		:
+		VALUE=
+		START_RECORDING=NO
+		PASS_ONCE_1=NO
+		PASS_ONCE_2=NO
+		PASS_ONCE_3=NO
+		PASS_ONCE_4=NO
+		PASS_ONCE_5=NO
+		PASS_ONCE_6=NO
+		PASS_ONCE_7=NO
+		PASS_ONCE_8=NO
+		PASS_ONCE_9=NO
+		PASS_ONCE_10=NO
+		PASS_ONCE_11=NO
+		for VALUE in $(cat "${PROJECT_DIR}/assets.xml"); do
+			if [[ "${VALUE}" == "<key>ActualMinimumSystemPartition</key>" ]]; then
+				START_RECORDING=YES
+			fi
+			if [[ "${START_RECORDING}" == YES ]]; then
+				echo "${VALUE}" >> "${PROJECT_DIR}/data/untitled.txt"
+				if [[ "${VALUE}" == "<key>Build</key>" ]]; then
+					PASS_ONCE_1=YES
+				elif [[ "${PASS_ONCE_1}" == YES ]]; then
+					PASS_ONCE_1=NO
+					NAME_BUILD="$(echo "${VALUE}" | cut -d">" -f2 | cut -d"<" -f1)"
+				fi
+				if [[ "${VALUE}" == "<key>OSVersion</key>" ]]; then
+					PASS_ONCE_2=YES
+				elif [[ "${PASS_ONCE_2}" == YES ]]; then
+					PASS_ONCE_2=NO
+					NAME_OSVERSION="$(echo "${VALUE}" | cut -d">" -f2 | cut -d"<" -f1)"
+					if [[ ! -z "${VERSION}" && ! "${NAME_OSVERSION}" == "${VERSION}" && ! "${NAME_OSVERSION}" == "9.9.${VERSION}" ]]; then
+						START_RECORDING=NO
+						rm "${PROJECT_DIR}/data/untitled.txt"
+					fi
+				fi
+				if [[ "${VALUE}" == "<key>PrerequisiteBuild</key" ]]; then
+					PASS_ONCE_3=YES
+				elif [[ "${PASS_ONCE_3}" == YES ]]; then
+					PASS_ONCE_3=NO
+					NAME_PREREQUISITE_BUILD="$(echo "${VALUE}" | cut -d">" -f2 | cut -d"<" -f1)"
+					if [[ ! -z "${PREREQUISITE_BUILD}" && ! "${PREREQUISITE_BUILD}" == "${NAME_PREREQUISITE_BUILD}" ]]; then
+						START_RECORDING=NO
+						rm "${PROJECT_DIR}/data/untitled.txt"
+					fi
+				fi
+				if [[ "${VALUE}" == "<key>PrerequisiteOSVersion</key" ]]; then
+					PASS_ONCE_4=YES
+				elif [[ "${PASS_ONCE_4}" == YES ]]; then
+					PASS_ONCE_4=NO
+					NAME_PREREQUISITE_VERSION="$(echo "${VALUE}" | cut -d">" -f2 | cut -d"<" -f1)"
+					if [[ ! -z "${PREREQUISITE_VERISON}" && ! "${PREREQUISITE_VERISON}" == "${NAME_PREREQUISITE_VERSION}" ]]; then
+						START_RECORDING=NO
+						rm "${PROJECT_DIR}/data/untitled.txt"
+					fi
+				fi
+				if [[ "${VALUE}" == "<key>SUDocumentationID</key>" ]]; then
+					PASS_ONCE_5=YES
+				elif [[ "${PASS_ONCE_5}" == YES ]]; then
+					PASS_ONCE_5=NO
+					NAME_INTERNAL_BUILD_NAME="$(echo "${VALUE}" | cut -d">" -f2 | cut -d"<" -f1)"
+				fi
+				if [[ "${VALUE}" == "<key>SupportedDeviceModels</key>" ]]; then
+					PASS_ONCE_6=YES
+				elif [[ "${PASS_ONCE_6}" == YES ]]; then
+					PASS_ONCE_6=NO
+					PASS_ONCE_7=YES
+				elif [[ "${PASS_ONCE_7}" == YES ]]; then
+					PASS_ONCE_7=NO
+					NAME_CODE_DEVICE="$(echo "${VALUE}" | cut -d">" -f2 | cut -d"<" -f1)"
+					if [[ ! -z "${DEVICE}" && ! "${NAME_CODE_DEVICE}" == "${DEVICE}" && ! "${NAME_CODE_DEVICE}" == "${DEVICE}" ]]; then
+						PASS_ONCE_8=YES
+					fi
+				fi
+				if [[ "${VALUE}" == "<key>SupportedDevices</key>" ]]; then
+					PASS_ONCE_9=YES
+				elif [[ "${PASS_ONCE_9}" == YES ]]; then
+					PASS_ONCE_9=NO
+					PASS_ONCE_10=YES
+				elif [[ "${PASS_ONCE_10}" == YES ]]; then
+					PASS_ONCE_10=NO
+					NAME_DEVICE="$(echo "${VALUE}" | cut -d">" -f2 | cut -d"<" -f1)"
+					if [[ "${PASS_ONCE_8}" == YES && ! -z "${DEVICE}" && ! "${NAME_DEVICE}" == "${DEVICE}" && ! "${NAME_DEVICE}" == "${DEVICE}" ]]; then
+						START_RECORDING=NO
+						rm "${PROJECT_DIR}/data/untitled.txt"
+					fi
+				fi
+				if [[ "${VALUE}" == "<key>__RelativePath</key>" ]]; then
+					PASS_ONCE_11=YES
+				elif [[ "${PASS_ONCE_11}" == YES ]]; then
+					PASS_ONCE_11=NO
+					START_RECORDING=NO
+					mv "${PROJECT_DIR}/data/untitled.txt" "${PROJECT_DIR}/data/${NAME_CODE_DEVICE}_${NAME_DEVICE}_${NAME_OSVERSION}_${NAME_BUILD}.txt"
+					NAME_CODE_DEVICE=
+					NAME_DEVICE=
+					NAME_OSVERSION=
+					NAME_BUILD=
+				fi
+			fi
+		done
 	fi		
+}
+
+function filterData(){
+	:
+}
+
+function showFinder(){
+	open "${PROJECT_DIR}/data"
 }
 
 function deleteFile(){
