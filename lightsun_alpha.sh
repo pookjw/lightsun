@@ -1,6 +1,6 @@
 #!/bin/sh
 # lightsun
-TOOL_VERSION=3
+TOOL_VERSION=4
 TOOL_BUILD=alpha
 SEEDUTIL_COMMAND="sudo /System/Library/PrivateFrameworks/Seeding.framework/Versions/A/Resources/seedutil"
 SYSTEM_BUILD="$(sw_vers -buildVersion)"
@@ -8,7 +8,9 @@ SYSTEM_VERSION="$(sw_vers -productVersion)"
 
 function setDefaultSettings(){
 	PLATFORM=iOS
-	CATALOG=https://mesu.apple.com/assets/iOS11DeveloperSeed
+	CATALOG=https://mesu.apple.com/assets
+	VERSION=11.2.5
+	DEVICE=iPhone10,4
 }
 
 function setProjectPath(){
@@ -82,26 +84,18 @@ function showInferface(){
 				showTitleBar
 				showLines "-"
 				echo "(1) macOS"
-				echo "(2) iOS"
+				echo "(2) iOS, watchOS, tvOS, etc..."
 				showLines "*"
 				readAnswer
 
 				if [[ "${ANSWER}" == 1 ]]; then
 					resetValues
 					PLATFORM=macOS
-					CATALOG=
-					echo "Fill Version and Build with current macOS? (y/n)"
-					readAnswer
-					if [[ "${ANSWER}" == y || "${ANSWER}" == yes ]]; then
-						VERSION="${SYSTEM_VERSION}"
-						BUILD="${SYSTEM_BUILD}"
-					fi
 					backTitleBar
 					break
 				elif [[ "${ANSWER}" == 2 ]]; then
 					resetValues
-					PLATFORM=iOS
-					CATALOG=
+					PLATFORM=etc
 					backTitleBar
 					break
 				else
@@ -133,6 +127,9 @@ function showInferface(){
 						echo "(1) Detect from OTA Profile (.mobileconfig)"
 					fi
 					echo "(2) Enter URL manually"
+					if [[ ! "${PLATFORM}" == macOS ]]; then
+						echo "(3) See list of URL (only for non-macOS)"
+					fi
 					showLines "*"
 					readAnswer
 
@@ -149,6 +146,24 @@ function showInferface(){
 						readAnswer "CATALOG=" CATALOG
 						backTitleBar
 						break
+					elif [[ "${ANSWER}" == 3 ]]; then
+						if [[ "${PLATFORM}" == macOS ]]; then
+							showNotSupportedCommand
+						else
+							addTitleBar "List of URL"
+							clear
+							showLines "*"
+							showTitleBar
+							showLines "-"
+							echo "https://mesu.apple.com/assets"
+							echo "https://mesu.apple.com/assets/watch"
+							echo "http://mesu.apple.com/assets/tv"
+							echo "http://mesu.apple.com/assets/audio"
+							echo "https://mesu.apple.com/assets/iOS11DeveloperSeed"
+							showLines "*"
+							showPA2C
+							backTitleBar
+						fi
 					else
 						replyAnswer
 					fi
@@ -173,7 +188,7 @@ function showInferface(){
 				showError "Fill Platform and Catalog."
 				showPA2C
 			else
-				startService
+				break
 			fi
 		else
 			replyAnswer
@@ -356,13 +371,6 @@ function backTitleBar(){
 	TITLE_NUM=$((${TITLE_NUM}-1))
 }
 
-function startService(){
-	downloadCatalog
-	parseAssets
-	showFinder
-	quitTool 0
-}
-
 function downloadCatalog(){
 	deleteFile "${PROJECT_DIR}/assets.gz"
 	deleteFile "${PROJECT_DIR}/assets"
@@ -388,14 +396,10 @@ function downloadCatalog(){
 
 function parseAssets(){
 	mkdir -p "${PROJECT_DIR}/data"
+	startOverParseStage
+	VALUE=
 	if [[ "${PLATFORM}" == macOS ]]; then
-		VALUE=
-		START_RECORDING=NO
 		PASS_ONCE_1=YES
-		PASS_ONCE_2=NO
-		PASS_ONCE_3=NO
-		PASS_ONCE_4=NO
-		PASS_ONCE_5=NO
 		for VALUE in $(cat "${PROJECT_DIR}/assets.xml"); do
 			if [[ "${PASS_ONCE_1}" == YES ]]; then
 				SUB_VALUE_1="${VALUE}"
@@ -437,19 +441,6 @@ function parseAssets(){
 			fi
 		done
 	else
-		VALUE=
-		START_RECORDING=NO
-		PASS_ONCE_1=NO
-		PASS_ONCE_2=NO
-		PASS_ONCE_3=NO
-		PASS_ONCE_4=NO
-		PASS_ONCE_5=NO
-		PASS_ONCE_6=NO
-		PASS_ONCE_7=NO
-		PASS_ONCE_8=NO
-		PASS_ONCE_9=NO
-		PASS_ONCE_10=NO
-		PASS_ONCE_11=NO
 		for VALUE in $(cat "${PROJECT_DIR}/assets.xml"); do
 			if [[ "${VALUE}" == "<key>ActualMinimumSystemPartition</key>" ]]; then
 				START_RECORDING=YES
@@ -460,43 +451,47 @@ function parseAssets(){
 					PASS_ONCE_1=YES
 				elif [[ "${PASS_ONCE_1}" == YES ]]; then
 					PASS_ONCE_1=NO
-					NAME_BUILD="$(echo "${VALUE}" | cut -d">" -f2 | cut -d"<" -f1)"
+					NAME_BUILD="${VALUE}"
+					if [[ ! -z "${BUILD}" && ! "<string>${BUILD}</string>" == "${NAME_BUILD}" ]]; then
+						startOverParseStage
+					fi
 				fi
 				if [[ "${VALUE}" == "<key>OSVersion</key>" ]]; then
 					PASS_ONCE_2=YES
 				elif [[ "${PASS_ONCE_2}" == YES ]]; then
 					PASS_ONCE_2=NO
-					NAME_OSVERSION="$(echo "${VALUE}" | cut -d">" -f2 | cut -d"<" -f1)"
-					if [[ ! -z "${VERSION}" && ! "${NAME_OSVERSION}" == "${VERSION}" && ! "${NAME_OSVERSION}" == "9.9.${VERSION}" ]]; then
-						START_RECORDING=NO
-						rm "${PROJECT_DIR}/data/untitled.txt"
+					NAME_OSVERSION="${VALUE}"
+					if [[ ! -z "${VERSION}" && ! "<string>${VERSION}</string>" == "${NAME_OSVERSION}" && ! "<string>9.9.${VERSION}</string>" == "${NAME_OSVERSION}" ]]; then
+						startOverParseStage
 					fi
 				fi
-				if [[ "${VALUE}" == "<key>PrerequisiteBuild</key" ]]; then
+				if [[ "${VALUE}" == "<key>PrerequisiteBuild</key>" ]]; then
 					PASS_ONCE_3=YES
 				elif [[ "${PASS_ONCE_3}" == YES ]]; then
 					PASS_ONCE_3=NO
-					NAME_PREREQUISITE_BUILD="$(echo "${VALUE}" | cut -d">" -f2 | cut -d"<" -f1)"
-					if [[ ! -z "${PREREQUISITE_BUILD}" && ! "${PREREQUISITE_BUILD}" == "${NAME_PREREQUISITE_BUILD}" ]]; then
-						START_RECORDING=NO
-						rm "${PROJECT_DIR}/data/untitled.txt"
+					SEARCHED_PREREQUISITE=YES
+					if [[ -z "${PREREQUISITE_BUILD}" || "<string>${PREREQUISITE_BUILD}</string>" == "${VALUE}" ]]; then
+						NAME_PREREQUISITE_BUILD="${VALUE}"
+					else
+						startOverParseStage
 					fi
 				fi
-				if [[ "${VALUE}" == "<key>PrerequisiteOSVersion</key" ]]; then
+				if [[ "${VALUE}" == "<key>PrerequisiteOSVersion</key>" ]]; then
 					PASS_ONCE_4=YES
 				elif [[ "${PASS_ONCE_4}" == YES ]]; then
 					PASS_ONCE_4=NO
-					NAME_PREREQUISITE_VERSION="$(echo "${VALUE}" | cut -d">" -f2 | cut -d"<" -f1)"
-					if [[ ! -z "${PREREQUISITE_VERISON}" && ! "${PREREQUISITE_VERISON}" == "${NAME_PREREQUISITE_VERSION}" ]]; then
-						START_RECORDING=NO
-						rm "${PROJECT_DIR}/data/untitled.txt"
+					SEARCHED_PREREQUISITE=YES
+					if [[ -z "${PREREQUISITE_VERISON}" || "<string>${PREREQUISITE_VERISON}</string>" == "${VALUE}" ]]; then
+						NAME_PREREQUISITE_VERSION="${VALUE}"
+					else
+						startOverParseStage
 					fi
 				fi
 				if [[ "${VALUE}" == "<key>SUDocumentationID</key>" ]]; then
 					PASS_ONCE_5=YES
 				elif [[ "${PASS_ONCE_5}" == YES ]]; then
 					PASS_ONCE_5=NO
-					NAME_INTERNAL_BUILD_NAME="$(echo "${VALUE}" | cut -d">" -f2 | cut -d"<" -f1)"
+					NAME_INTERNAL_BUILD_NAME="${VALUE}"
 				fi
 				if [[ "${VALUE}" == "<key>SupportedDeviceModels</key>" ]]; then
 					PASS_ONCE_6=YES
@@ -505,8 +500,8 @@ function parseAssets(){
 					PASS_ONCE_7=YES
 				elif [[ "${PASS_ONCE_7}" == YES ]]; then
 					PASS_ONCE_7=NO
-					NAME_CODE_DEVICE="$(echo "${VALUE}" | cut -d">" -f2 | cut -d"<" -f1)"
-					if [[ ! -z "${DEVICE}" && ! "${NAME_CODE_DEVICE}" == "${DEVICE}" && ! "${NAME_CODE_DEVICE}" == "${DEVICE}" ]]; then
+					NAME_CODE_DEVICE="${VALUE}"
+					if [[ ! -z "${DEVICE}" && ! "<string>${DEVICE}</string>" == "${NAME_CODE_DEVICE}" ]]; then
 						PASS_ONCE_8=YES
 					fi
 				fi
@@ -517,34 +512,66 @@ function parseAssets(){
 					PASS_ONCE_10=YES
 				elif [[ "${PASS_ONCE_10}" == YES ]]; then
 					PASS_ONCE_10=NO
-					NAME_DEVICE="$(echo "${VALUE}" | cut -d">" -f2 | cut -d"<" -f1)"
-					if [[ "${PASS_ONCE_8}" == YES && ! -z "${DEVICE}" && ! "${NAME_DEVICE}" == "${DEVICE}" && ! "${NAME_DEVICE}" == "${DEVICE}" ]]; then
-						START_RECORDING=NO
-						rm "${PROJECT_DIR}/data/untitled.txt"
+					NAME_DEVICE="${VALUE}"
+					if [[ "${PASS_ONCE_8}" == YES && ! -z "<string>${DEVICE}" && ! "<string>${DEVICE}</string>" == "${NAME_DEVICE}" ]]; then
+						startOverParseStage
 					fi
 				fi
 				if [[ "${VALUE}" == "<key>__RelativePath</key>" ]]; then
 					PASS_ONCE_11=YES
 				elif [[ "${PASS_ONCE_11}" == YES ]]; then
 					PASS_ONCE_11=NO
-					START_RECORDING=NO
-					mv "${PROJECT_DIR}/data/untitled.txt" "${PROJECT_DIR}/data/${NAME_CODE_DEVICE}_${NAME_DEVICE}_${NAME_OSVERSION}_${NAME_BUILD}.txt"
-					NAME_CODE_DEVICE=
-					NAME_DEVICE=
-					NAME_OSVERSION=
-					NAME_BUILD=
+					NAME_BUILD="$(echo "${NAME_BUILD}" | cut -d">" -f2 | cut -d"<" -f1)"
+					NAME_OSVERSION="$(echo "${NAME_OSVERSION}" | cut -d">" -f2 | cut -d"<" -f1)"
+					NAME_PREREQUISITE_BUILD="$(echo "${NAME_PREREQUISITE_BUILD}" | cut -d">" -f2 | cut -d"<" -f1)"
+					NAME_PREREQUISITE_VERSION="$(echo "${NAME_PREREQUISITE_VERSION}" | cut -d">" -f2 | cut -d"<" -f1)"
+					NAME_INTERNAL_BUILD_NAME="$(echo "${NAME_INTERNAL_BUILD_NAME}" | cut -d">" -f2 | cut -d"<" -f1)"
+					NAME_CODE_DEVICE="$(echo "${NAME_CODE_DEVICE}" | cut -d">" -f2 | cut -d"<" -f1)"
+					NAME_DEVICE="$(echo "${NAME_DEVICE}" | cut -d">" -f2 | cut -d"<" -f1)"
+					if [[ "${SEARCHED_PREREQUISITE}" == YES ]]; then
+						mv "${PROJECT_DIR}/data/untitled.txt" "${PROJECT_DIR}/data/${NAME_CODE_DEVICE}_${NAME_DEVICE}_${NAME_OSVERSION}_${NAME_BUILD}_${NAME_INTERNAL_BUILD_NAME}_Prerequisite_${NAME_PREREQUISITE_VERSION}_${NAME_PREREQUISITE_BUILD}.txt"
+					else
+						if [[ -z "${PREREQUISITE_BUILD}" && -z "${PREREQUISITE_VERISON}" ]]; then	
+							mv "${PROJECT_DIR}/data/untitled.txt" "${PROJECT_DIR}/data/${NAME_CODE_DEVICE}_${NAME_DEVICE}_${NAME_OSVERSION}_${NAME_BUILD}_${NAME_INTERNAL_BUILD_NAME}.txt"
+						fi
+					fi
+					startOverParseStage
 				fi
 			fi
 		done
 	fi		
 }
 
-function filterData(){
-	:
+function startOverParseStage(){
+	START_RECORDING=NO
+	PASS_ONCE_1=NO
+	PASS_ONCE_2=NO
+	PASS_ONCE_3=NO
+	PASS_ONCE_4=NO
+	PASS_ONCE_5=NO
+	PASS_ONCE_6=NO
+	PASS_ONCE_7=NO
+	PASS_ONCE_8=NO
+	PASS_ONCE_9=NO
+	PASS_ONCE_10=NO
+	PASS_ONCE_11=NO
+	NAME_BUILD=
+	NAME_OSVERSION=
+	NAME_PREREQUISITE_BUILD=
+	NAME_PREREQUISITE_VERSION=
+	NAME_INTERNAL_BUILD_NAME=
+	NAME_CODE_DEVICE=
+	NAME_DEVICE=
+	SEARCHED_PREREQUISITE=NO
+	deleteFile "${PROJECT_DIR}/data/untitled.txt"
 }
 
 function showFinder(){
-	open "${PROJECT_DIR}/data"
+	if [[ -z "$(ls "${PROJECT_DIR}/data")" ]]; then
+		showError "No data found."
+	else
+		open "${PROJECT_DIR}/data"
+	fi
 }
 
 function deleteFile(){
@@ -565,3 +592,7 @@ function quitTool(){
 setDefaultSettings
 setProjectPath
 showInferface
+downloadCatalog
+parseAssets
+showFinder
+quitTool 0
