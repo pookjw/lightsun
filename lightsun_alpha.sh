@@ -1,10 +1,8 @@
 #!/bin/sh
 # lightsun
-TOOL_VERSION=6
+TOOL_VERSION=7
 TOOL_BUILD=alpha
 SEEDUTIL_COMMAND="sudo /System/Library/PrivateFrameworks/Seeding.framework/Versions/A/Resources/seedutil"
-SYSTEM_BUILD="$(sw_vers -buildVersion)"
-SYSTEM_VERSION="$(sw_vers -productVersion)"
 
 function setDefaultSettings(){
 	PLATFORM=iOS
@@ -23,6 +21,7 @@ function setProjectPath(){
 			break
 		fi
 	done
+	mkdir -p "${PROJECT_DIR}/data"
 	mkdir -p "${PROJECT_DIR}/TitleBar"
 }
 
@@ -189,15 +188,15 @@ function showInferface(){
 			fi
 		elif [[ "${ANSWER}" == 7 ]]; then
 			if [[ ! "${PLATFORM}" == macOS && ! "${PARSE_DOCUMENTATION_ONLY}" == YES ]]; then
-				showNotSupportedCommand
-			else
 				readAnswer "PREREQUISITE_VERISON=" PREREQUISITE_VERISON
+			else
+				showNotSupportedCommand
 			fi
 		elif [[ "${ANSWER}" == 8 ]]; then
 			if [[ ! "${PLATFORM}" == macOS && ! "${PARSE_DOCUMENTATION_ONLY}" == YES ]]; then
-				showNotSupportedCommand
-			else
 				readAnswer "PREREQUISITE_BUILD=" PREREQUISITE_BUILD
+			else
+				showNotSupportedCommand
 			fi
 		elif [[ "${ANSWER}" == reset || "${ANSWER}" == r ]]; then
 			resetValues
@@ -410,11 +409,10 @@ function backTitleBar(){
 	TITLE_NUM=$((${TITLE_NUM}-1))
 }
 
-function downloadCatalog(){
+function downloadAssets(){
 	deleteFile "${PROJECT_DIR}/assets.gz"
 	deleteFile "${PROJECT_DIR}/assets"
 	deleteFile "${PROJECT_DIR}/assets.xml"
-	deleteFile "${PROJECT_DIR}/documentation.xml"
 	if [[ "${PLATFORM}" == macOS ]]; then
 		curl -# -o "${PROJECT_DIR}/assets.gz" "${CATALOG}"
 		gunzip "${PROJECT_DIR}/assets.gz"
@@ -424,27 +422,28 @@ function downloadCatalog(){
 		fi
 		mv "${PROJECT_DIR}/assets" "${PROJECT_DIR}/assets.xml"
 	else
-		if [[ ! "${PARSE_DOCUMENTATION_ONLY}" == YES ]]; then
-			curl -# -o "${PROJECT_DIR}/assets.xml" "${CATALOG}/com_apple_MobileAsset_SoftwareUpdate/com_apple_MobileAsset_SoftwareUpdate.xml"
-			if [[ ! -f "${PROJECT_DIR}/assets.xml" ]]; then
-				showError "Failed to get assets."
-				quitTool 1
-			fi
-		fi
-		if [[ "${PLATFORM}" == watchOS ]]; then
-			curl -# -o "${PROJECT_DIR}/documentation.xml" "https://mesu.apple.com/assets/watch/com_apple_MobileAsset_WatchSoftwareUpdateDocumentation/com_apple_MobileAsset_WatchSoftwareUpdateDocumentation.xml"
-		else
-			curl -# -o "${PROJECT_DIR}/documentation.xml" "${CATALOG}/com_apple_MobileAsset_SoftwareUpdateDocumentation/com_apple_MobileAsset_SoftwareUpdateDocumentation.xml"
-		fi
-		if [[ ! -f "${PROJECT_DIR}/documentation.xml" ]]; then
-			showError "Failed to get documentation."
+		curl -# -o "${PROJECT_DIR}/assets.xml" "${CATALOG}/com_apple_MobileAsset_SoftwareUpdate/com_apple_MobileAsset_SoftwareUpdate.xml"
+		if [[ ! -f "${PROJECT_DIR}/assets.xml" ]]; then
+			showError "Failed to get assets."
 			quitTool 1
 		fi
 	fi
 }
 
+function downloadDocumentation(){
+	deleteFile "${PROJECT_DIR}/documentation.xml"
+	if [[ "${PLATFORM}" == watchOS ]]; then
+		curl -# -o "${PROJECT_DIR}/documentation.xml" "https://mesu.apple.com/assets/com_apple_MobileAsset_WatchSoftwareUpdateDocumentation/com_apple_MobileAsset_WatchSoftwareUpdateDocumentation.xml"
+	else
+		curl -# -o "${PROJECT_DIR}/documentation.xml" "${CATALOG}/com_apple_MobileAsset_SoftwareUpdateDocumentation/com_apple_MobileAsset_SoftwareUpdateDocumentation.xml"
+	fi
+	if [[ ! -f "${PROJECT_DIR}/documentation.xml" ]]; then
+		showError "Failed to get documentation."
+		quitTool 1
+	fi
+}
+
 function parseAssets(){
-	mkdir -p "${PROJECT_DIR}/data"
 	startOverParseStage
 	VALUE=
 	if [[ "${PLATFORM}" == macOS ]]; then
@@ -581,14 +580,6 @@ function parseAssets(){
 							mv "${PROJECT_DIR}/data/untitled.txt" "${PROJECT_DIR}/data/${NAME_CODE_DEVICE}_${NAME_DEVICE}_${NAME_OSVERSION}_${NAME_BUILD}_${NAME_INTERNAL_BUILD}.txt"
 						fi
 					fi
-					if [[ -z "${INTERNAL_BUILD_NAME}" ]]; then
-						INTERNAL_BUILD_NAME="${NAME_INTERNAL_BUILD}"
-						EMPTY_INTERNAL_BUILD_NAME=YES
-					fi
-					parseDocumentation
-					if [[ "${EMPTY_INTERNAL_BUILD_NAME}" == YES ]]; then
-						INTERNAL_BUILD_NAME=
-					fi
 					startOverParseStage
 				fi
 			fi
@@ -597,7 +588,6 @@ function parseAssets(){
 }
 
 function parseDocumentation(){
-	mkdir -p "${PROJECT_DIR}/data"
 	startOverParseStage
 	VALUE=
 	for VALUE in $(cat "${PROJECT_DIR}/documentation.xml"); do
@@ -629,7 +619,7 @@ function parseDocumentation(){
 			elif [[ "${PASS_ONCE_3}" == YES ]]; then
 				PASS_ONCE_3=NO
 				NAME_INTERNAL_BUILD="${VALUE}"
-				if [[ ! -z "${INTERNAL_BUILD_NAME}" && ! "$<string>${INTERNAL_BUILD_NAME}</string>" == "${VALUE}" ]]; then
+				if [[ ! -z "${INTERNAL_BUILD_NAME}" && ! "<string>${INTERNAL_BUILD_NAME}</string>" == "${VALUE}" ]]; then
 					startOverParseStage
 				fi
 			fi
@@ -679,15 +669,6 @@ function cutName(){
 	NAME_DEVICE="$(echo "${NAME_DEVICE}" | cut -d">" -f2 | cut -d"<" -f1)"
 }
 
-
-function showFinder(){
-	if [[ -z "$(ls "${PROJECT_DIR}/data")" ]]; then
-		showError "No data found."
-	else
-		open "${PROJECT_DIR}/data"
-	fi
-}
-
 function deleteFile(){
 	if [[ ! -z "${1}" ]]; then
 		if [[ -f "${1}" ]]; then
@@ -706,11 +687,17 @@ function quitTool(){
 setDefaultSettings
 setProjectPath
 showInferface
-downloadCatalog
-if [[ "${PARSE_DOCUMENTATION_ONLY}" == YES ]]; then
-	parseDocumentation
-else
+if [[ ! "${PARSE_DOCUMENTATION_ONLY}" == YES ]]; then
+	downloadAssets
 	parseAssets
 fi
-showFinder
-quitTool 0
+if [[ -z "$(ls "${PROJECT_DIR}/data")" && ! "${PARSE_DOCUMENTATION_ONLY}" == YES ]]; then
+	showError "No data found."
+	quitTool 1
+else
+	downloadDocumentation
+	parseDocumentation
+	echo "Location of data : ${PROJECT_DIR}/data"
+	open "${PROJECT_DIR}/data"
+	quitTool 0
+fi
