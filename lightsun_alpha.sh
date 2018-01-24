@@ -1,6 +1,6 @@
 #!/bin/sh
 # lightsun
-TOOL_VERSION=5
+TOOL_VERSION=6
 TOOL_BUILD=alpha
 SEEDUTIL_COMMAND="sudo /System/Library/PrivateFrameworks/Seeding.framework/Versions/A/Resources/seedutil"
 SYSTEM_BUILD="$(sw_vers -buildVersion)"
@@ -202,8 +202,18 @@ function showInferface(){
 		elif [[ "${ANSWER}" == reset || "${ANSWER}" == r ]]; then
 			resetValues
 		elif [[ "${ANSWER}" == start || "${ANSWER}" == s ]]; then
-			if [[ -z "${PLATFORM}" || -z "${CATALOG}" ]]; then
-				showError "Fill Platform and Catalog."
+			if [[ -z "${PLATFORM}" ]]; then
+				showError "Fill Platform."
+				HAS_ERROR=YES
+			fi
+			if [[ -z "${CATALOG}" ]]; then
+				if [[ ! "${PLATFORM}" == watchOS || ! "${PARSE_DOCUMENTATION_ONLY}" == YES ]]; then
+					showError "Fill Catalog."
+					HAS_ERROR=YES
+				fi
+			fi
+			if [[ "${HAS_ERROR}" == YES ]]; then
+				HAS_ERROR=NO
 				showPA2C
 			else
 				break
