@@ -1,13 +1,14 @@
 #!/bin/sh
 # lightsun
-TOOL_VERSION=7
+TOOL_VERSION=8
 TOOL_BUILD=alpha
 SEEDUTIL_COMMAND="sudo /System/Library/PrivateFrameworks/Seeding.framework/Versions/A/Resources/seedutil"
 
 function setDefaultSettings(){
-	PLATFORM=iOS
-	CATALOG=https://mesu.apple.com/assets/iOS11DeveloperSeed
-	VERSION=11.3
+	PLATFORM=macOS
+	CATALOG=https://swscan.apple.com/content/catalogs/others/index-10.13seed-10.13-10.12-10.11-10.10-10.9-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog.gz
+	VERSION=10.13.4
+	BUILD=17E139j
 }
 
 function setProjectPath(){
@@ -52,16 +53,18 @@ function showInferface(){
 		else
 			echo "(4) Build: ${BUILD}"
 		fi
-		if [[ -z "${INTERNAL_BUILD_NAME}" ]]; then
-			echo "(5) Documentation ID : (undefined)"
-		else
-			echo "(5) Documentation ID : ${INTERNAL_BUILD_NAME}"
-		fi
 		if [[ ! "${PLATFORM}" == watchOS || ! "${PARSE_DOCUMENTATION_ONLY}" == YES ]]; then
 			if [[ -z "${CATALOG}" ]]; then
-				echo "(6) Catalog : (undefined)"
+				echo "(5) Catalog : (undefined)"
 			else
-				echo "(6) Catalog : ${CATALOG}"
+				echo "(5) Catalog : ${CATALOG}"
+			fi
+		fi
+		if [[ ! "${PLATFORM}" == macOS ]]; then
+			if [[ -z "${INTERNAL_BUILD_NAME}" ]]; then
+				echo "(6) Documentation ID : (undefined)"
+			else
+				echo "(6) Documentation ID : ${INTERNAL_BUILD_NAME}"
 			fi
 		fi
 		if [[ ! "${PLATFORM}" == macOS && ! "${PARSE_DOCUMENTATION_ONLY}" == YES ]]; then
@@ -124,8 +127,6 @@ function showInferface(){
 		elif [[ "${ANSWER}" == 4 ]]; then
 			readAnswer "BUILD=" BUILD
 		elif [[ "${ANSWER}" == 5 ]]; then
-			readAnswer "INTERNAL_BUILD_NAME=" INTERNAL_BUILD_NAME
-		elif [[ "${ANSWER}" == 6 ]]; then
 			addTitleBar "Set catalog"
 			if [[ -z "${PLATFORM}" ]]; then
 				showError "Define Platform first."
@@ -186,6 +187,8 @@ function showInferface(){
 					fi
 				done
 			fi
+		elif [[ "${ANSWER}" == 6 ]]; then
+			readAnswer "INTERNAL_BUILD_NAME=" INTERNAL_BUILD_NAME
 		elif [[ "${ANSWER}" == 7 ]]; then
 			if [[ ! "${PLATFORM}" == macOS && ! "${PARSE_DOCUMENTATION_ONLY}" == YES ]]; then
 				readAnswer "PREREQUISITE_VERISON=" PREREQUISITE_VERISON
@@ -314,8 +317,9 @@ function showAdvancedSettings(){
 		echo "(3) Enroll to DeveloperSeed"
 		echo "(4) Enroll to PublicSeed"
 		echo "(5) Unenroll Seed"
+		echo "(6) Set Profile"
 		if [[ "${PARSE_DOCUMENTATION_ONLY}" == YES ]]; then
-			echo "(6) Parse documentation only : ${PARSE_DOCUMENTATION_ONLY}"
+			echo "(7) Parse documentation only : ${PARSE_DOCUMENTATION_ONLY}"
 		else
 			echo "(6) Parse documentation only : NO"
 		fi
@@ -339,6 +343,34 @@ function showAdvancedSettings(){
 			"${SEEDUTIL_COMMAND}" unenroll
 			showPA2C
 		elif [[ "${ANSWER}" == 6 ]]; then
+			addTitleBar "Set Profile"
+			while(true); do
+				clear
+				showLines "*"
+				showTitleBar
+				showLines "-"
+				echo "(1) macOS 1"
+				echo "(2) iOS 1"
+				showLines "*"
+				readAnswer
+				if [[ "${ANSWER}" == 1 ]]; then
+					resetValues
+					PLATFORM=macOS
+					CATALOG=https://swscan.apple.com/content/catalogs/others/index-10.13seed-10.13-10.12-10.11-10.10-10.9-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog.gz
+					VERSION=10.13.4
+					BUILD=17E139j
+					break
+				elif [[ "${ANSWER}" == 2 ]]; then
+					resetValues
+					PLATFORM=etc
+					CATALOG=https://mesu.apple.com/assets/iOS11DeveloperSeed
+					VERSION=11.3
+					break
+				else
+					replyAnswer
+				fi
+			done
+		elif [[ "${ANSWER}" == 7 ]]; then
 			if [[ "${PARSE_DOCUMENTATION_ONLY}" == YES ]]; then
 				PARSE_DOCUMENTATION_ONLY=NO
 			else
@@ -449,43 +481,100 @@ function parseAssets(){
 	if [[ "${PLATFORM}" == macOS ]]; then
 		PASS_ONCE_1=YES
 		for VALUE in $(cat "${PROJECT_DIR}/assets.xml"); do
-			if [[ "${PASS_ONCE_1}" == YES ]]; then
-				SUB_VALUE_1="${VALUE}"
-				PASS_ONCE_1=NO
-				PASS_ONCE_2=YES
-				if [[ "${SUB_VALUE_1}" == "<key>ServerMetadataURL</key>" ]]; then
-					UPDATE_KEY="$(echo "${SUB_VALUE_2}" | cut -d">" -f2 | cut -d"<" -f1)"
-					START_RECORDING=YES
+			if [[ ! "${START_RECORDING}" == YES ]]; then
+				if [[ "${PASS_ONCE_1}" == YES ]]; then
+					SUB_VALUE_1="${VALUE}"
+					PASS_ONCE_1=NO
+					PASS_ONCE_2=YES
+					if [[ "${SUB_VALUE_1}" == "<key>ServerMetadataURL</key>" ]]; then
+						UPDATE_KEY="$(echo "${SUB_VALUE_2}" | cut -d">" -f2 | cut -d"<" -f1)"
+						START_RECORDING=YES
+					fi
+				elif [[ "${PASS_ONCE_2}" == YES ]]; then
+					SUB_VALUE_2="${VALUE}"
+					PASS_ONCE_2=NO
+					PASS_ONCE_3=YES
+					if [[ "${SUB_VALUE_2}" == "<key>ServerMetadataURL</key>" ]]; then
+						UPDATE_KEY="$(echo "${SUB_VALUE_3}" | cut -d">" -f2 | cut -d"<" -f1)"
+						START_RECORDING=YES
+					fi
+				elif [[ "${PASS_ONCE_3}" == YES ]]; then
+					SUB_VALUE_3="${VALUE}"
+					PASS_ONCE_3=NO
+					PASS_ONCE_1=YES
+					if [[ "${SUB_VALUE_3}" == "<key>ServerMetadataURL</key>" ]]; then
+						UPDATE_KEY="$(echo "${SUB_VALUE_1}" | cut -d">" -f2 | cut -d"<" -f1)"
+						START_RECORDING=YES
+					fi
 				fi
-			elif [[ "${PASS_ONCE_2}" == YES ]]; then
-				SUB_VALUE_2="${VALUE}"
-				PASS_ONCE_2=NO
-				PASS_ONCE_3=YES
-				if [[ "${SUB_VALUE_2}" == "<key>ServerMetadataURL</key>" ]]; then
-					UPDATE_KEY="$(echo "${SUB_VALUE_3}" | cut -d">" -f2 | cut -d"<" -f1)"
-					START_RECORDING=YES
-				fi
-			elif [[ "${PASS_ONCE_3}" == YES ]]; then
-				SUB_VALUE_3="${VALUE}"
-				PASS_ONCE_3=NO
-				PASS_ONCE_1=YES
-				if [[ "${SUB_VALUE_3}" == "<key>ServerMetadataURL</key>" ]]; then
-					UPDATE_KEY="$(echo "${SUB_VALUE_1}" | cut -d">" -f2 | cut -d"<" -f1)"
-					START_RECORDING=YES
-				fi
-			fi
-			if [[ ! -z "$(echo "${VALUE}" | grep ".dist</string>")" ]]; then
-				PASS_ONCE_4=YES
-				PASS_ONCE_5=NO
-			elif [[ "${PASS_ONCE_4}" == YES ]]; then
-				PASS_ONCE_4=NO
-				PASS_ONCE_5=YES
-			elif [[ "${PASS_ONCE_5}" == YES ]]; then
-				START_RECORDING=NO
-				PASS_ONCE_5=NO
 			fi
 			if [[ "${START_RECORDING}" == YES ]]; then
 				echo "${VALUE}" >> "${PROJECT_DIR}/data/${UPDATE_KEY}.txt"
+				if [[ ! -z "${VERSION}" ]]; then
+					if [[ "${VALUE}" == "<key>ProductVersion</key>" ]]; then
+						PASS_ONCE_4=YES
+					elif [[ "${PASS_ONCE_4}" == YES ]]; then
+						PASS_ONCE_4=NO
+						SEARCHED_VERSION=YES
+						if [[ ! "<string>${VERSION}</string>" == "${VALUE}" ]]; then
+							startOverParseStage
+						fi
+					fi
+				fi
+				if [[ ! -z "${BUILD}" || ! -z "${DEVICE}" ]]; then
+					if [[ "${VALUE}" == "<key>English</key>" ]]; then
+						if [[ ! -z "${VERSION}" && ! "${SEARCHED_VERSION}" == YES ]]; then
+							startOverParseStage
+						else
+							PASS_ONCE_5=YES
+						fi
+					elif [[ "${PASS_ONCE_5}" == YES ]]; then
+						PASS_ONCE_5=NO
+						deleteFile "${PROJECT_DIR}/English.dist"
+						echo "${UPDATE_KEY}"
+						curl -# -o "${PROJECT_DIR}/English.dist" "$(echo "${VALUE}" | cut -d">" -f2 | cut -d"<" -f1)"
+						if [[ -f "${PROJECT_DIR}/English.dist" ]]; then
+							if [[ ! -z "${BUILD}" ]]; then
+								for VALUE in $(cat "${PROJECT_DIR}/English.dist"); do
+									if [[ "${VALUE}" == "<key>macOSProductBuildVersion</key>" ]]; then
+										PASS_ONCE_6=YES
+									elif [[ "${PASS_ONCE_6}" == YES ]]; then
+										PASS_ONCE_6=NO
+										if [[ "<string>${BUILD}</string>" == "${VALUE}" ]]; then
+											SEARCHED_BUILD=YES
+										else
+											startOverParseStage
+										fi
+										break
+									fi
+								done
+							fi
+							if [[ ! -z "${DEVICE}" && ! -z "$(cat "${PROJECT_DIR}/English.dist" | grep "nonSupportedModels" | grep "${DEVICE}")" ]]; then
+								startOverParseStage
+							fi
+							deleteFile "${PROJECT_DIR}/English.dist"
+						else
+							showError "Failed to get ${UPDATE_KEY} Distributions."
+							startOverParseStage
+						fi
+					fi
+				fi
+				if [[ ! -z "$(echo "${VALUE}" | grep ".dist</string>")" ]]; then
+					PASS_ONCE_7=YES
+					PASS_ONCE_8=NO
+				elif [[ "${PASS_ONCE_7}" == YES ]]; then
+					PASS_ONCE_7=NO
+					PASS_ONCE_8=YES
+				elif [[ "${PASS_ONCE_8}" == YES ]]; then
+					PASS_ONCE_8=NO
+					if [[ ! -z "${VERSION}" && ! "${SEARCHED_VERSION}" == YES ]]; then
+						startOverParseStage
+					fi
+					if [[ ! -z "${BUILD}" && ! "${SEARCHED_BUILD}" == YES ]]; then
+						startOverParseStage
+					fi
+					startOverParseStage --no-reset
+				fi
 			fi
 		done
 	else
@@ -636,7 +725,6 @@ function parseDocumentation(){
 }
 
 function startOverParseStage(){
-	START_RECORDING=NO
 	PASS_ONCE_1=NO
 	PASS_ONCE_2=NO
 	PASS_ONCE_3=NO
@@ -648,6 +736,16 @@ function startOverParseStage(){
 	PASS_ONCE_9=NO
 	PASS_ONCE_10=NO
 	PASS_ONCE_11=NO
+	if [[ "${PLATFORM}" == macOS ]]; then
+		if [[ ! "${1}" == "--no-reset" && ! -z "${UPDATE_KEY}" ]]; then
+			deleteFile "${PROJECT_DIR}/data/${UPDATE_KEY}.txt"
+		fi
+		PASS_ONCE_1=YES
+	fi
+	deleteFile "${PROJECT_DIR}/data/untitled.txt"
+	deleteFile "${PROJECT_DIR}/English.dist"
+	START_RECORDING=NO
+	UPDATE_KEY=
 	NAME_BUILD=
 	NAME_OSVERSION=
 	NAME_PREREQUISITE_BUILD=
@@ -655,8 +753,9 @@ function startOverParseStage(){
 	NAME_INTERNAL_BUILD=
 	NAME_CODE_DEVICE=
 	NAME_DEVICE=
+	SEARCHED_VERSION=NO
+	SEARCHED_VERSION=NO
 	SEARCHED_PREREQUISITE=NO
-	deleteFile "${PROJECT_DIR}/data/untitled.txt"
 }
 
 function cutName(){
@@ -695,9 +794,20 @@ if [[ -z "$(ls "${PROJECT_DIR}/data")" && ! "${PARSE_DOCUMENTATION_ONLY}" == YES
 	showError "No data found."
 	quitTool 1
 else
-	downloadDocumentation
-	parseDocumentation
-	echo "Location of data : ${PROJECT_DIR}/data"
-	open "${PROJECT_DIR}/data"
-	quitTool 0
+	if [[ "${PLATFORM}" == macOS ]]; then
+		echo "Location of data : ${PROJECT_DIR}/data"
+		open "${PROJECT_DIR}/data"
+		quitTool 0
+	else
+		downloadDocumentation
+		parseDocumentation
+		if [[ -z "$(ls "${PROJECT_DIR}/data")" ]]; then
+			showError "No data found."
+			quitTool 1
+		else
+			echo "Location of data : ${PROJECT_DIR}/data"
+			open "${PROJECT_DIR}/data"
+			quitTool 0
+		fi
+	fi
 fi
