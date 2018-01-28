@@ -1,14 +1,15 @@
 #!/bin/sh
 # lightsun
-TOOL_VERSION=9
+TOOL_VERSION=10
 TOOL_BUILD=alpha
 SEEDUTIL_COMMAND="sudo /System/Library/PrivateFrameworks/Seeding.framework/Versions/A/Resources/seedutil"
 
 function setDefaultSettings(){
-	PLATFORM=macOS
-	CATALOG=https://swscan.apple.com/content/catalogs/others/index-10.13seed-10.13-10.12-10.11-10.10-10.9-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog.gz
-	VERSION=10.13.4
-	BUILD=17E139j
+	#PLATFORM=macOS
+	#CATALOG=https://swscan.apple.com/content/catalogs/others/index-10.13seed-10.13-10.12-10.11-10.10-10.9-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog.gz
+	#VERSION=10.13.4
+	#BUILD=17E139j
+	:
 }
 
 function setProjectPath(){
@@ -31,55 +32,56 @@ function showInferface(){
 	while(true); do
 		clear
 		showLines "*"
-		echo "lightsun_${TOOL_BUILD}-${TOOL_VERSION} by pookjw"
+		showTitleBar
 		showLines "-"
 		if [[ -z "${PLATFORM}" ]]; then
-			echo "(1) Platform : (undefined)"
+			echo "(1) Platform : ${RED}(undefined)${NC}"
 		else
-			echo "(1) Platform : ${PLATFORM}"
+			echo "(1) Platform : ${BLUE}${PLATFORM}${NC}"
 		fi
 		if [[ -z "${DEVICE}" ]]; then
 			echo "(2) Device: (undefined)"
 		else
-			echo "(2) Device: ${DEVICE}"
+			echo "(2) Device: ${BLUE}${DEVICE}${NC}"
 		fi
 		if [[ -z "${VERSION}" ]]; then
 			echo "(3) Version: (undefined)"
 		else
-			echo "(3) Version: ${VERSION}"
+			echo "(3) Version: ${BLUE}${VERSION}${NC}"
 		fi
 		if [[ -z "${BUILD}" ]]; then
 			echo "(4) Build: (undefined)"
 		else
-			echo "(4) Build: ${BUILD}"
+			echo "(4) Build: ${BLUE}${BUILD}${NC}"
 		fi
 		if [[ ! "${PLATFORM}" == watchOS || ! "${PARSE_DOCUMENTATION_ONLY}" == YES ]]; then
 			if [[ -z "${CATALOG}" ]]; then
-				echo "(5) Catalog : (undefined)"
+				echo "(5) Catalog : ${RED}(undefined)${NC}"
 			else
-				echo "(5) Catalog : ${CATALOG}"
+				echo "(5) Catalog : ${BLUE}${CATALOG}${NC}"
 			fi
 		fi
 		if [[ ! "${PLATFORM}" == macOS ]]; then
 			if [[ -z "${INTERNAL_BUILD_NAME}" ]]; then
 				echo "(6) Documentation ID : (undefined)"
 			else
-				echo "(6) Documentation ID : ${INTERNAL_BUILD_NAME}"
+				echo "(6) Documentation ID : ${BLUE}${INTERNAL_BUILD_NAME}${NC}"
 			fi
 		fi
 		if [[ ! "${PLATFORM}" == macOS && ! "${PARSE_DOCUMENTATION_ONLY}" == YES ]]; then
 			if [[ -z "${PREREQUISITE_VERISON}" ]]; then
-				echo "(7) Prerequisite Version: (undefined)"
+				echo "(7) Prerequisite Version : (undefined)"
 			else
-				echo "(7) Prerequisite Version: ${PREREQUISITE_VERISON}"
+				echo "(7) Prerequisite Version : ${BLUE}${PREREQUISITE_VERISON}${NC}"
 			fi
 			if [[ -z "${PREREQUISITE_BUILD}" ]]; then
-				echo "(8) Prerequisite Build: (undefined)"
+				echo "(8) Prerequisite Build : (undefined)"
 			else
-				echo "(8) Prerequisite Build: ${PREREQUISITE_BUILD}"
+				echo "(8) Prerequisite Build : ${BLUE}${PREREQUISITE_BUILD}${NC}"
 			fi
 		fi
 		showLines "-"
+		echo "lightsun_${TOOL_BUILD}-${TOOL_VERSION} by pookjw"
 		echo "commands: 1~7, adv, back, exit, reset, start"
 		showLines "*"
 		readAnswer
@@ -128,8 +130,8 @@ function showInferface(){
 					showLines "*"
 					showTitleBar
 					showLines "-"
-					echo "(1) Set as this machine. ($(sysctl -n hw.model))"
-					echo "(2) Enter manually."
+					echo "(1) Set as this machine ($(sysctl -n hw.model))"
+					echo "(2) Enter manually"
 					showLines "*"
 					readAnswer
 
@@ -156,8 +158,8 @@ function showInferface(){
 					showLines "*"
 					showTitleBar
 					showLines "-"
-					echo "(1) Set as this macOS. ($(sw_vers -productVersion))"
-					echo "(2) Enter manually."
+					echo "(1) Set as this macOS ($(sw_vers -productVersion))"
+					echo "(2) Enter manually"
 					showLines "*"
 					readAnswer
 
@@ -184,8 +186,8 @@ function showInferface(){
 					showLines "*"
 					showTitleBar
 					showLines "-"
-					echo "(1) Set as this macOS. ($(sw_vers -buildVersion))"
-					echo "(2) Enter manually."
+					echo "(1) Set as this macOS ($(sw_vers -buildVersion))"
+					echo "(2) Enter manually"
 					showLines "*"
 					readAnswer
 
@@ -218,13 +220,13 @@ function showInferface(){
 					showLines "-"
 
 					if [[ "${PLATFORM}" == macOS ]]; then
-						echo "(1) Detect from this macOS."
+						echo "(1) Detect from this macOS"
 					else
-						echo "(1) Detect from OTA Profile. (.mobileconfig)"
+						echo "(1) Detect from OTA Profile (.mobileconfig)"
 					fi
 					echo "(2) Enter URL manually."
 					if [[ ! "${PLATFORM}" == macOS ]]; then
-						echo "(3) See list of URL. (only for non-macOS)"
+						echo "(3) See list of URL (only for non-macOS)"
 					fi
 					showLines "*"
 					readAnswer
@@ -352,6 +354,7 @@ function resetValues(){
 	VERSION=
 	BUILD=
 	CATALOG=
+	INTERNAL_BUILD_NAME=
 	PREREQUISITE_VERISON=
 	PREREQUISITE_BUILD=
 }
@@ -400,10 +403,12 @@ function showAdvancedSettings(){
 		echo "(4) Enroll to PublicSeed"
 		echo "(5) Unenroll Seed"
 		echo "(6) Set Profile"
+		echo "(7) Set Color Scheme"
+		echo "(8) Remove Color Scheme"
 		if [[ "${PARSE_DOCUMENTATION_ONLY}" == YES ]]; then
-			echo "(7) Parse documentation only : ${PARSE_DOCUMENTATION_ONLY}"
+			echo "(9) Parse documentation only : ${BLUE}${PARSE_DOCUMENTATION_ONLY}${NC}"
 		else
-			echo "(7) Parse documentation only : NO"
+			echo "(9) Parse documentation only : ${BLUE}NO${NC}"
 		fi
 		showLines "-"
 		echo "PROJECT_DIR=${PROJECT_DIR}"
@@ -455,6 +460,11 @@ function showAdvancedSettings(){
 				fi
 			done
 		elif [[ "${ANSWER}" == 7 ]]; then
+			setColorScheme
+		elif [[ "${ANSWER}" == 8 ]]; then
+			BLUE=
+			RED=
+		elif [[ "${ANSWER}" == 9 ]]; then
 			if [[ "${PARSE_DOCUMENTATION_ONLY}" == YES ]]; then
 				PARSE_DOCUMENTATION_ONLY=NO
 			else
@@ -468,14 +478,14 @@ function showAdvancedSettings(){
 
 function showError(){
 	if [[ -z "${1}" ]]; then
-		echo "ERROR!"
+		echo "${RED}ERROR!${NC}"
 	else
-		echo "ERROR: ${1}"
+		echo "${RED}ERROR: ${1}${NC}"
 	fi
 }
 
 function showNotSupportedCommand(){
-	echo "Not supported command: ${ANSWER}"
+	echo "${RED}Not supported command: ${ANSWER}${NC}"
 	showPA2C
 }
 
@@ -619,6 +629,7 @@ function parseAssets(){
 						curl -# -o "${PROJECT_DIR}/English.dist" "$(echo "${VALUE}" | cut -d">" -f2 | cut -d"<" -f1)"
 						if [[ -f "${PROJECT_DIR}/English.dist" ]]; then
 							if [[ ! -z "${BUILD}" ]]; then
+								SUB_VALUE_4="${VALUE}"
 								for VALUE in $(cat "${PROJECT_DIR}/English.dist"); do
 									if [[ "${VALUE}" == "<key>macOSProductBuildVersion</key>" ]]; then
 										PASS_ONCE_6=YES
@@ -632,6 +643,7 @@ function parseAssets(){
 										break
 									fi
 								done
+								VALUE="${SUB_VALUE_4}"
 							fi
 							if [[ ! -z "${DEVICE}" && ! -z "$(cat "${PROJECT_DIR}/English.dist" | grep "nonSupportedModels" | grep "${DEVICE}")" ]]; then
 								startOverParseStage
@@ -809,6 +821,10 @@ function parseDocumentation(){
 }
 
 function startOverParseStage(){
+	SUB_VALUE_1=NO
+	SUB_VALUE_2=NO
+	SUB_VALUE_3=NO
+	SUB_VALUE_4=NO
 	PASS_ONCE_1=NO
 	PASS_ONCE_2=NO
 	PASS_ONCE_3=NO
@@ -852,6 +868,12 @@ function cutName(){
 	NAME_DEVICE="$(echo "${NAME_DEVICE}" | cut -d">" -f2 | cut -d"<" -f1)"
 }
 
+function setColorScheme(){
+	BLUE="\033[1;36m"
+	RED="\033[1;31m"
+	NC="\033[0m"
+}
+
 function deleteFile(){
 	if [[ ! -z "${1}" ]]; then
 		if [[ -f "${1}" ]]; then
@@ -869,6 +891,7 @@ function quitTool(){
 
 setDefaultSettings
 setProjectPath
+setColorScheme
 showInferface
 if [[ ! "${PARSE_DOCUMENTATION_ONLY}" == YES ]]; then
 	downloadAssets
