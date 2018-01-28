@@ -1,6 +1,6 @@
 #!/bin/sh
 # lightsun
-TOOL_VERSION=8
+TOOL_VERSION=9
 TOOL_BUILD=alpha
 SEEDUTIL_COMMAND="sudo /System/Library/PrivateFrameworks/Seeding.framework/Versions/A/Resources/seedutil"
 
@@ -121,11 +121,89 @@ function showInferface(){
 				fi
 			done
 		elif [[ "${ANSWER}" == 2 ]]; then
-			readAnswer "DEVICE=" DEVICE
+			if [[ "${PLATFORM}" == macOS ]]; then
+				addTitleBar "Set Device"
+				while(true); do
+					clear
+					showLines "*"
+					showTitleBar
+					showLines "-"
+					echo "(1) Set as this machine. ($(sysctl -n hw.model))"
+					echo "(2) Enter manually."
+					showLines "*"
+					readAnswer
+
+					if [[ "${ANSWER}" == 1 ]]; then
+						DEVICE="$(sysctl -n hw.model)"
+						backTitleBar
+						break
+					elif [[ "${ANSWER}" == 2 ]]; then
+						readAnswer "DEVICE=" DEVICE
+						backTitleBar
+						break
+					else
+						replyAnswer
+					fi
+				done
+			else
+				readAnswer "DEVICE=" DEVICE
+			fi
 		elif [[ "${ANSWER}" == 3 ]]; then
-			readAnswer "VERSION=" VERSION
+			if [[ "${PLATFORM}" == macOS ]]; then
+				addTitleBar "Set Version"
+				while(true); do
+					clear
+					showLines "*"
+					showTitleBar
+					showLines "-"
+					echo "(1) Set as this macOS. ($(sw_vers -productVersion))"
+					echo "(2) Enter manually."
+					showLines "*"
+					readAnswer
+
+					if [[ "${ANSWER}" == 1 ]]; then
+						VERSION="$(sw_vers -productVersion)"
+						backTitleBar
+						break
+					elif [[ "${ANSWER}" == 2 ]]; then
+						readAnswer "VERSION=" VERSION
+						backTitleBar
+						break
+					else
+						replyAnswer
+					fi
+				done
+			else
+				readAnswer "VERSION=" VERSION
+			fi
 		elif [[ "${ANSWER}" == 4 ]]; then
-			readAnswer "BUILD=" BUILD
+			if [[ "${PLATFORM}" == macOS ]]; then
+				addTitleBar "Set Build"
+				while(true); do
+					clear
+					showLines "*"
+					showTitleBar
+					showLines "-"
+					echo "(1) Set as this macOS. ($(sw_vers -buildVersion))"
+					echo "(2) Enter manually."
+					showLines "*"
+					readAnswer
+
+					if [[ "${ANSWER}" == 1 ]]; then
+						BUILD="$(sw_vers -buildVersion)"
+						backTitleBar
+						break
+					elif [[ "${ANSWER}" == 2 ]]; then
+						readAnswer "BUILD=" BUILD
+						backTitleBar
+						break
+					else
+						replyAnswer
+					fi
+				done
+			else
+				readAnswer "BUILD=" BUILD
+			fi
 		elif [[ "${ANSWER}" == 5 ]]; then
 			addTitleBar "Set catalog"
 			if [[ -z "${PLATFORM}" ]]; then
@@ -140,13 +218,13 @@ function showInferface(){
 					showLines "-"
 
 					if [[ "${PLATFORM}" == macOS ]]; then
-						echo "(1) Detect from this macOS"
+						echo "(1) Detect from this macOS."
 					else
-						echo "(1) Detect from OTA Profile (.mobileconfig)"
+						echo "(1) Detect from OTA Profile. (.mobileconfig)"
 					fi
-					echo "(2) Enter URL manually"
+					echo "(2) Enter URL manually."
 					if [[ ! "${PLATFORM}" == macOS ]]; then
-						echo "(3) See list of URL (only for non-macOS)"
+						echo "(3) See list of URL. (only for non-macOS)"
 					fi
 					showLines "*"
 					readAnswer
@@ -188,7 +266,11 @@ function showInferface(){
 				done
 			fi
 		elif [[ "${ANSWER}" == 6 ]]; then
-			readAnswer "INTERNAL_BUILD_NAME=" INTERNAL_BUILD_NAME
+			if [[ "${PLATFORM}" == macOS ]]; then
+				showNotSupportedCommand
+			else
+				readAnswer "INTERNAL_BUILD_NAME=" INTERNAL_BUILD_NAME
+			fi
 		elif [[ "${ANSWER}" == 7 ]]; then
 			if [[ ! "${PLATFORM}" == macOS && ! "${PARSE_DOCUMENTATION_ONLY}" == YES ]]; then
 				readAnswer "PREREQUISITE_VERISON=" PREREQUISITE_VERISON
@@ -321,7 +403,7 @@ function showAdvancedSettings(){
 		if [[ "${PARSE_DOCUMENTATION_ONLY}" == YES ]]; then
 			echo "(7) Parse documentation only : ${PARSE_DOCUMENTATION_ONLY}"
 		else
-			echo "(6) Parse documentation only : NO"
+			echo "(7) Parse documentation only : NO"
 		fi
 		showLines "-"
 		echo "PROJECT_DIR=${PROJECT_DIR}"
@@ -359,12 +441,14 @@ function showAdvancedSettings(){
 					CATALOG=https://swscan.apple.com/content/catalogs/others/index-10.13seed-10.13-10.12-10.11-10.10-10.9-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog.gz
 					VERSION=10.13.4
 					BUILD=17E139j
+					backTitleBar
 					break
 				elif [[ "${ANSWER}" == 2 ]]; then
 					resetValues
 					PLATFORM=etc
 					CATALOG=https://mesu.apple.com/assets/iOS11DeveloperSeed
 					VERSION=11.3
+					backTitleBar
 					break
 				else
 					replyAnswer
