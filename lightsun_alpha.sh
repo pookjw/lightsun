@@ -1,6 +1,6 @@
 #!/bin/sh
 # lightsun
-TOOL_VERSION=10
+TOOL_VERSION=11
 TOOL_BUILD=alpha
 SEEDUTIL_COMMAND="sudo /System/Library/PrivateFrameworks/Seeding.framework/Versions/A/Resources/seedutil"
 
@@ -82,7 +82,7 @@ function showInferface(){
 		fi
 		showLines "-"
 		echo "lightsun_${TOOL_BUILD}-${TOOL_VERSION} by pookjw"
-		echo "commands: 1~7, adv, back, exit, reset, start"
+		echo "commands: ${BLUE}*${NC}number${BLUE}*${NC}, adv, back, exit, reset, start"
 		showLines "*"
 		readAnswer
 
@@ -372,16 +372,16 @@ function readAnswer(){
 }
 
 function replyAnswer(){
-	if [[ "${ANSWER}" == back || "${ANSWER}" == q ]]; then
+	if [[ "${ANSWER}" == back || "${ANSWER}" == b || "${ANSWER}" == q ]]; then
 		if [[ "$(showTitleBar)" == Home ]]; then
 			showNotSupportedCommand
 		else
 			backTitleBar
 			break
 		fi
-	elif [[ "${ANSWER}" == exit ]]; then
+	elif [[ "${ANSWER}" == exit || "${ANSWER}" == e ]]; then
 		quitTool 0
-	elif [[ "${ANSWER}" == adv ]]; then
+	elif [[ "${ANSWER}" == adv || "${ANSWER}" == a ]]; then
 		showAdvancedSettings
 	elif [[ -z "${ANSWER}" ]]; then
 		:
@@ -655,21 +655,24 @@ function parseAssets(){
 						fi
 					fi
 				fi
-				if [[ ! -z "$(echo "${VALUE}" | grep ".dist</string>")" ]]; then
+				if [[ "${VALUE}" == "<key>English</key>" ]]; then
 					PASS_ONCE_7=YES
-					PASS_ONCE_8=NO
 				elif [[ "${PASS_ONCE_7}" == YES ]]; then
 					PASS_ONCE_7=NO
 					PASS_ONCE_8=YES
 				elif [[ "${PASS_ONCE_8}" == YES ]]; then
 					PASS_ONCE_8=NO
-					if [[ ! -z "${VERSION}" && ! "${SEARCHED_VERSION}" == YES ]]; then
-						startOverParseStage
+					if [[ "${VALUE}" == "</dict>" ]]; then
+						if [[ ! -z "${VERSION}" && ! "${SEARCHED_VERSION}" == YES ]]; then
+							startOverParseStage
+						fi
+						if [[ ! -z "${VERSION}" && ! "${SEARCHED_VERSION}" == YES ]]; then
+							startOverParseStage
+						fi
+						startOverParseStage --no-reset
+					else
+						PASS_ONCE_7=YES
 					fi
-					if [[ ! -z "${BUILD}" && ! "${SEARCHED_BUILD}" == YES ]]; then
-						startOverParseStage
-					fi
-					startOverParseStage --no-reset
 				fi
 			fi
 		done
