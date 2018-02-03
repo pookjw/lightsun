@@ -1,8 +1,9 @@
 #!/bin/sh
 # lightsun
-TOOL_VERSION=11
+TOOL_VERSION=13
 TOOL_BUILD=alpha
 SEEDUTIL_COMMAND="sudo /System/Library/PrivateFrameworks/Seeding.framework/Versions/A/Resources/seedutil"
+SYSTEM_TYPE="$(sw_vers -productName)"
 
 function setDefaultSettings(){
 	#PLATFORM=macOS
@@ -82,11 +83,14 @@ function showInferface(){
 		fi
 		showLines "-"
 		echo "lightsun_${TOOL_BUILD}-${TOOL_VERSION} by pookjw"
-		echo "commands: ${BLUE}*${NC}number${BLUE}*${NC}, adv, back, exit, reset, start"
+		echo "Available commands: ${BLUE}*${NC}number${BLUE}*${NC}, adv, back, exit, reset, start"
 		showLines "*"
 		readAnswer
 
-		if [[ "${ANSWER}" == 1 ]]; then
+		if [[ ! -z "$(echo "${ANSWER}" | grep number )" ]]; then
+			showError "uh... That's no. Enter number like 1, 2, 3..."
+			showPA2C
+		elif [[ "${ANSWER}" == 1 ]]; then
 			addTitleBar "Set Platform"
 			while(true); do
 				clear
@@ -313,17 +317,21 @@ function showInferface(){
 function detectCatalog(){
 	CATALOG=
 	if [[ "${PLATFORM}" == macOS ]]; then
-		CURRENT_ENROLLED_SEED=$(${SEEDUTIL_COMMAND} current | grep "Currently enrolled in" | cut -d" " -f4)
-		echo "Currently enrolled in: ${CURRENT_ENROLLED_SEED}"
-		if [[ "${CURRENT_ENROLLED_SEED}" == "(null)" ]]; then
-			"${SEEDUTIL_COMMAND}" enroll DeveloperSeed > /dev/null 2>&1
+		if [[ "${SYSTEM_TYPE}" == "Mac OS X" ]]; then
+			CURRENT_ENROLLED_SEED=$(${SEEDUTIL_COMMAND} current | grep "Currently enrolled in" | cut -d" " -f4)
+			echo "Currently enrolled in: ${CURRENT_ENROLLED_SEED}"
+			if [[ "${CURRENT_ENROLLED_SEED}" == "(null)" ]]; then
+				"${SEEDUTIL_COMMAND}" enroll DeveloperSeed > /dev/null 2>&1
+			fi
+			CATALOG=$(${SEEDUTIL_COMMAND} current | grep CatalogURL | cut -d" " -f2)
+			echo "CatalogURL: ${CATALOG}"
+			if [[ "${CURRENT_ENROLLED_SEED}" == "(null)" ]]; then
+				"${SEEDUTIL_COMMAND}" unenroll > /dev/null 2>&1
+			fi
+			showPA2C
+		else
+			showError "${SYSTEM_TYPE} is not supported for detecting ${PLATFORM} catalog."
 		fi
-		CATALOG=$(${SEEDUTIL_COMMAND} current | grep CatalogURL | cut -d" " -f2)
-		echo "CatalogURL: ${CATALOG}"
-		if [[ "${CURRENT_ENROLLED_SEED}" == "(null)" ]]; then
-			"${SEEDUTIL_COMMAND}" unenroll > /dev/null 2>&1
-		fi
-		showPA2C
 	else
 		readAnswer "Path of .mobileconfig: " PATH_MOBILECONFIG
 		if [[ -z "${PATH_MOBILECONFIG}" ]]; then
@@ -403,12 +411,17 @@ function showAdvancedSettings(){
 		echo "(4) Enroll to PublicSeed"
 		echo "(5) Unenroll Seed"
 		echo "(6) Set Profile"
-		echo "(7) Set Color Scheme"
+		echo "(7) ${RED}S${NC}e${BLUE}t${NC} C${RED}o${NC}l${BLUE}o${NC}r ${RED}S${NC}c${BLUE}h${NC}e${RED}m${NC}e"
 		echo "(8) Remove Color Scheme"
-		if [[ "${PARSE_DOCUMENTATION_ONLY}" == YES ]]; then
-			echo "(9) Parse documentation only : ${BLUE}${PARSE_DOCUMENTATION_ONLY}${NC}"
+		if [[ "${NO_SSL}" == YES ]]; then
+			echo "(9) NO_SSL : ${NO_SSL}"
 		else
-			echo "(9) Parse documentation only : ${BLUE}NO${NC}"
+			echo "(9) NO_SSL : NO"
+		fi
+		if [[ "${PARSE_DOCUMENTATION_ONLY}" == YES ]]; then
+			echo "(10) Parse documentation only : ${BLUE}${PARSE_DOCUMENTATION_ONLY}${NC}"
+		else
+			echo "(10) Parse documentation only : ${BLUE}NO${NC}"
 		fi
 		showLines "-"
 		echo "PROJECT_DIR=${PROJECT_DIR}"
@@ -462,9 +475,14 @@ function showAdvancedSettings(){
 		elif [[ "${ANSWER}" == 7 ]]; then
 			setColorScheme
 		elif [[ "${ANSWER}" == 8 ]]; then
-			BLUE=
-			RED=
+			removeColorScheme
 		elif [[ "${ANSWER}" == 9 ]]; then
+			if [[ "${NO_SSL}" == YES ]]; then
+				NO_SSL=NO
+			else
+				NO_SSL=YES
+			fi
+		elif [[ "${ANSWER}" == 10 ]]; then
 			if [[ "${PARSE_DOCUMENTATION_ONLY}" == YES ]]; then
 				PARSE_DOCUMENTATION_ONLY=NO
 			else
@@ -535,12 +553,20 @@ function backTitleBar(){
 	TITLE_NUM=$((${TITLE_NUM}-1))
 }
 
+function downloadFile(){
+	if [[ "${NO_SSL}" == YES ]]; then
+		curl -k -# -o "${1}" "${2}"
+	else
+		curl -# -o "${1}" "${2}"
+	fi
+}
+
 function downloadAssets(){
 	deleteFile "${PROJECT_DIR}/assets.gz"
 	deleteFile "${PROJECT_DIR}/assets"
 	deleteFile "${PROJECT_DIR}/assets.xml"
 	if [[ "${PLATFORM}" == macOS ]]; then
-		curl -# -o "${PROJECT_DIR}/assets.gz" "${CATALOG}"
+		downloadFile "${PROJECT_DIR}/assets.gz" "${CATALOG}"
 		gunzip "${PROJECT_DIR}/assets.gz"
 		if [[ ! -f  "${PROJECT_DIR}/assets" ]]; then
 			showError "Failed to get assets."
@@ -548,7 +574,7 @@ function downloadAssets(){
 		fi
 		mv "${PROJECT_DIR}/assets" "${PROJECT_DIR}/assets.xml"
 	else
-		curl -# -o "${PROJECT_DIR}/assets.xml" "${CATALOG}/com_apple_MobileAsset_SoftwareUpdate/com_apple_MobileAsset_SoftwareUpdate.xml"
+		downloadFile "${PROJECT_DIR}/assets.xml" "${CATALOG}/com_apple_MobileAsset_SoftwareUpdate/com_apple_MobileAsset_SoftwareUpdate.xml"
 		if [[ ! -f "${PROJECT_DIR}/assets.xml" ]]; then
 			showError "Failed to get assets."
 			quitTool 1
@@ -559,9 +585,9 @@ function downloadAssets(){
 function downloadDocumentation(){
 	deleteFile "${PROJECT_DIR}/documentation.xml"
 	if [[ "${PLATFORM}" == watchOS ]]; then
-		curl -# -o "${PROJECT_DIR}/documentation.xml" "https://mesu.apple.com/assets/com_apple_MobileAsset_WatchSoftwareUpdateDocumentation/com_apple_MobileAsset_WatchSoftwareUpdateDocumentation.xml"
+		downloadFile "${PROJECT_DIR}/documentation.xml" "https://mesu.apple.com/assets/com_apple_MobileAsset_WatchSoftwareUpdateDocumentation/com_apple_MobileAsset_WatchSoftwareUpdateDocumentation.xml"
 	else
-		curl -# -o "${PROJECT_DIR}/documentation.xml" "${CATALOG}/com_apple_MobileAsset_SoftwareUpdateDocumentation/com_apple_MobileAsset_SoftwareUpdateDocumentation.xml"
+		downloadFile "${PROJECT_DIR}/documentation.xml" "${CATALOG}/com_apple_MobileAsset_SoftwareUpdateDocumentation/com_apple_MobileAsset_SoftwareUpdateDocumentation.xml"
 	fi
 	if [[ ! -f "${PROJECT_DIR}/documentation.xml" ]]; then
 		showError "Failed to get documentation."
@@ -573,7 +599,6 @@ function parseAssets(){
 	startOverParseStage
 	VALUE=
 	if [[ "${PLATFORM}" == macOS ]]; then
-		PASS_ONCE_1=YES
 		for VALUE in $(cat "${PROJECT_DIR}/assets.xml"); do
 			if [[ ! "${START_RECORDING}" == YES ]]; then
 				if [[ "${PASS_ONCE_1}" == YES ]]; then
@@ -626,7 +651,7 @@ function parseAssets(){
 						PASS_ONCE_5=NO
 						deleteFile "${PROJECT_DIR}/English.dist"
 						echo "${UPDATE_KEY}"
-						curl -# -o "${PROJECT_DIR}/English.dist" "$(echo "${VALUE}" | cut -d">" -f2 | cut -d"<" -f1)"
+						downloadFile "${PROJECT_DIR}/English.dist" "$(echo "${VALUE}" | cut -d">" -f2 | cut -d"<" -f1)"
 						if [[ -f "${PROJECT_DIR}/English.dist" ]]; then
 							if [[ ! -z "${BUILD}" ]]; then
 								SUB_VALUE_4="${VALUE}"
@@ -877,6 +902,12 @@ function setColorScheme(){
 	NC="\033[0m"
 }
 
+function removeColorScheme(){
+	BLUE=
+	RED=
+	NC=
+}
+
 function deleteFile(){
 	if [[ ! -z "${1}" ]]; then
 		if [[ -f "${1}" ]]; then
@@ -892,13 +923,19 @@ function quitTool(){
 	exit "${1}"
 }
 
+##################################
+
 setDefaultSettings
 setProjectPath
 setColorScheme
+if [[ "${SYSTEM_TYPE}" == "iPhone OS" ]]; then
+	NO_SSL=YES
+	removeColorScheme
+fi
 showInferface
 if [[ ! "${PARSE_DOCUMENTATION_ONLY}" == YES ]]; then
 	downloadAssets
-	parseAssets
+	time parseAssets
 fi
 if [[ -z "$(ls "${PROJECT_DIR}/data")" && ! "${PARSE_DOCUMENTATION_ONLY}" == YES ]]; then
 	showError "No data found."
@@ -906,17 +943,21 @@ if [[ -z "$(ls "${PROJECT_DIR}/data")" && ! "${PARSE_DOCUMENTATION_ONLY}" == YES
 else
 	if [[ "${PLATFORM}" == macOS ]]; then
 		echo "Location of data : ${PROJECT_DIR}/data"
-		open "${PROJECT_DIR}/data"
+		if [[ ! "${SYSTEM_TYPE}" == "iPhone OS" ]]; then
+			open "${PROJECT_DIR}/data"
+		fi
 		quitTool 0
 	else
 		downloadDocumentation
-		parseDocumentation
+		time parseDocumentation
 		if [[ -z "$(ls "${PROJECT_DIR}/data")" ]]; then
 			showError "No data found."
 			quitTool 1
 		else
 			echo "Location of data : ${PROJECT_DIR}/data"
-			open "${PROJECT_DIR}/data"
+			if [[ ! "${SYSTEM_TYPE}" == "iPhone OS" ]]; then
+				open "${PROJECT_DIR}/data"
+			fi
 			quitTool 0
 		fi
 	fi
